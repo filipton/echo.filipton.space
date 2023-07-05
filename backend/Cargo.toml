@@ -1,0 +1,12 @@
+[package]
+name = "backend"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.71"
+hyper = "0.14.27"
+fastwebsockets = { git = "https://github.com/denoland/fastwebsockets.git", features = ["hyper", "upgrade"] }
+tokio = { version = "1.29.1", features = ["full"] }
