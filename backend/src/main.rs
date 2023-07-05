@@ -55,7 +55,31 @@ async fn request_handler(
 ) -> Result<Response<Body>> {
     let uri = req.uri().path();
 
-    if uri.starts_with("/r") {
+    if uri == "/" && is_upgrade_request(&req) {
+        let (resp, fut) = upgrade(&mut req)?;
+
+        tokio::spawn(async move {
+            let ws = fastwebsockets::FragmentCollector::new(fut.await.unwrap());
+            echo::handle_ws(ws).await.unwrap();
+        });
+
+        return Ok(resp);
+    } else if uri == "/ws" && is_upgrade_request(&req) {
+        let (resp, fut) = upgrade(&mut req)?;
+        let client_id = rand::random();
+
+        tokio::spawn(async move {
+            let ws = fastwebsockets::FragmentCollector::new(fut.await.unwrap());
+            webhook::handle_ws(ws, &client_id, &state).await.unwrap();
+
+            {
+                let mut state = state.write().await;
+                state.clients.remove(&client_id);
+            }
+        });
+
+        return Ok(resp);
+    } else if uri.starts_with("/r") {
         let client_id = uri[2..].parse()?;
         let req_str = request_to_raw_http(req).await?;
 
@@ -65,45 +89,36 @@ async fn request_handler(
             .await;
 
         return Ok(Response::builder().status(200).body("OK".into())?);
-    }
+    } else {
+        // serve static files
+        let state = state.read().await;
+        let mut is_html = false;
 
-    match uri {
-        "/" => {
-            if is_upgrade_request(&req) {
-                let (resp, fut) = upgrade(&mut req)?;
+        let mut file = state.files.get(uri);
+        if file.is_none() {
+            file = state
+                .files
+                .get(&format!("{}/index.html", uri.trim_end_matches('/')));
 
-                tokio::spawn(async move {
-                    let ws = fastwebsockets::FragmentCollector::new(fut.await.unwrap());
-                    echo::handle_ws(ws).await.unwrap();
-                });
-
-                return Ok(resp);
+            if file.is_some() {
+                is_html = true;
             }
+        }
 
-            let resp = Response::builder()
+        if let Some(file) = file {
+            let content_type = if is_html {
+                "text/html".to_string()
+            } else {
+                mime_guess::from_path(uri).first_or_text_plain().to_string()
+            };
+
+            return Ok(Response::builder()
                 .status(200)
-                .body("TODO: Main page".into())?;
-            return Ok(resp);
-        }
-        "/ws" => {
-            let (response, fut) = upgrade(&mut req)?;
-            let client_id = rand::random();
-
-            tokio::spawn(async move {
-                let ws = fastwebsockets::FragmentCollector::new(fut.await.unwrap());
-                webhook::handle_ws(ws, &client_id, &state).await.unwrap();
-
-                {
-                    let mut state = state.write().await;
-                    state.clients.remove(&client_id);
-                }
-            });
-
-            return Ok(response);
-        }
-        _ => {
-            let resp = Response::builder().status(404).body("Not found".into())?;
-            return Ok(resp);
+                .header("Content-Type", content_type)
+                .body(file.to_owned().into())?);
         }
     }
+
+    let resp = Response::builder().status(404).body("Not found".into())?;
+    return Ok(resp);
 }

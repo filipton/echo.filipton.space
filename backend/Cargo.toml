@@ -11,3 +11,4 @@ hyper = "0.14.27"
 fastwebsockets = { git = "https://github.com/denoland/fastwebsockets.git", features = ["hyper", "upgrade"] }
 tokio = { version = "1.29.1", features = ["full"] }
 rand = "0.8.5"
+mime_guess = "2.0.4"
