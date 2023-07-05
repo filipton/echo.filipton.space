@@ -1,6 +1,6 @@
 use crate::structs::WsMessage;
 use anyhow::Result;
-use fastwebsockets::upgrade::upgrade;
+use fastwebsockets::upgrade::{is_upgrade_request, upgrade};
 use fastwebsockets::{FragmentCollector, OpCode, WebSocketError};
 use hyper::server::conn::Http;
 use hyper::service::service_fn;
@@ -70,6 +70,21 @@ async fn request_handler(
     let uri = req.uri().path();
 
     match uri {
+        "/" => {
+            if is_upgrade_request(&req) {
+                let (resp, fut) = upgrade(&mut req)?;
+
+                tokio::spawn(async move {
+                    let ws = fastwebsockets::FragmentCollector::new(fut.await.unwrap());
+                    echo::handle_ws(ws).await.unwrap();
+                });
+
+                return Ok(resp);
+            }
+
+            let resp = Response::builder().status(200).body("TODO: Main page".into())?;
+            return Ok(resp);
+        }
         "/ws" => {
             let (response, fut) = upgrade(&mut req)?;
 
@@ -121,4 +136,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         });
     }
 }
-
