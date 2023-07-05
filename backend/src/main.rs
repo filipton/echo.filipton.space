@@ -1,40 +1,19 @@
 use crate::structs::WsMessage;
 use anyhow::Result;
 use fastwebsockets::upgrade::{is_upgrade_request, upgrade};
-use fastwebsockets::{FragmentCollector, WebSocketError};
 use hyper::server::conn::Http;
 use hyper::service::service_fn;
-use hyper::upgrade::Upgraded;
 use hyper::{Body, Request, Response};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use structs::{SharedState, State};
+use structs::{request_to_raw_http, SharedState, State};
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 
 mod echo;
 mod structs;
-
-async fn handle_ws(
-    mut ws: FragmentCollector<Upgraded>,
-    client_id: &u64,
-    state: &SharedState,
-) -> Result<(), WebSocketError> {
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    {
-        _ = tx.send(WsMessage::Binary(client_id.to_be_bytes().to_vec()));
-
-        let mut state = state.write().await;
-        state.clients.insert(*client_id, tx);
-    }
-
-    while let Some(msg) = rx.recv().await {
-        ws.write_frame(msg.to_frame()).await?;
-    }
-
-    Ok(())
-}
+mod webhook;
 
 async fn request_handler(
     mut req: Request<Body>,
@@ -79,7 +58,7 @@ async fn request_handler(
 
             tokio::spawn(async move {
                 let ws = fastwebsockets::FragmentCollector::new(fut.await.unwrap());
-                handle_ws(ws, &client_id, &state).await.unwrap();
+                webhook::handle_ws(ws, &client_id, &state).await.unwrap();
 
                 {
                     let mut state = state.write().await;
@@ -94,24 +73,6 @@ async fn request_handler(
             return Ok(resp);
         }
     }
-}
-
-async fn request_to_raw_http(req: Request<Body>) -> Result<String> {
-    let mut raw = format!(
-        "{} {} {:?}\r\n",
-        req.method(),
-        req.uri().path(),
-        req.version()
-    );
-
-    for (name, value) in req.headers() {
-        raw.push_str(&format!("{}: {}\r\n", name, value.to_str()?));
-    }
-
-    let body = hyper::body::to_bytes(req.into_body()).await;
-    raw.push_str(&format!("\r\n{}", String::from_utf8(body?.to_vec())?));
-
-    Ok(raw)
 }
 
 #[tokio::main]
