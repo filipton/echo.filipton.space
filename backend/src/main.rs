@@ -1,4 +1,3 @@
-use crate::structs::WsMessage;
 use anyhow::Result;
 use fastwebsockets::upgrade::{is_upgrade_request, upgrade};
 use hyper::server::conn::Http;
@@ -7,13 +6,47 @@ use hyper::{Body, Request, Response};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use structs::{request_to_raw_http, SharedState, State};
+use structs::{SharedState, State, WsMessage};
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
+use utils::{read_static_files, request_to_raw_http};
 
 mod echo;
 mod structs;
+mod utils;
 mod webhook;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let listener = TcpListener::bind(addr).await?;
+
+    println!("Listening on {}", addr);
+
+    let state = Arc::new(RwLock::new(State {
+        files: read_static_files("/")?,
+        clients: HashMap::new(),
+    }));
+    println!("Loaded {} static files!", state.read().await.files.len());
+
+    loop {
+        let (stream, client_addr) = listener.accept().await?;
+        let state = state.clone();
+
+        tokio::task::spawn(async move {
+            if let Err(err) = Http::new()
+                .serve_connection(
+                    stream,
+                    service_fn(move |req| request_handler(req, client_addr, state.clone())),
+                )
+                .with_upgrades()
+                .await
+            {
+                println!("Error serving connection: {:?}", err);
+            }
+        });
+    }
+}
 
 async fn request_handler(
     mut req: Request<Body>,
@@ -72,35 +105,5 @@ async fn request_handler(
             let resp = Response::builder().status(404).body("Not found".into())?;
             return Ok(resp);
         }
-    }
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
-    let listener = TcpListener::bind(addr).await?;
-
-    println!("Listening on {}", addr);
-
-    let state = Arc::new(RwLock::new(State {
-        clients: HashMap::new(),
-    }));
-
-    loop {
-        let (stream, client_addr) = listener.accept().await?;
-        let state = state.clone();
-
-        tokio::task::spawn(async move {
-            if let Err(err) = Http::new()
-                .serve_connection(
-                    stream,
-                    service_fn(move |req| request_handler(req, client_addr, state.clone())),
-                )
-                .with_upgrades()
-                .await
-            {
-                println!("Error serving connection: {:?}", err);
-            }
-        });
     }
 }
