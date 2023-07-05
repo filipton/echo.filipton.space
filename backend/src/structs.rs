@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use fastwebsockets::Frame;
 use tokio::sync::{mpsc::UnboundedSender, RwLock};
@@ -7,15 +7,13 @@ pub type Tx = UnboundedSender<WsMessage>;
 pub type SharedState = Arc<RwLock<State>>;
 
 pub struct State {
-    pub clients: HashMap<SocketAddr, Tx>,
+    pub clients: HashMap<u64, Tx>,
 }
 
 impl State {
-    pub async fn broadcast(&self, sender: &SocketAddr, msg: WsMessage) {
-        for (addr, tx) in self.clients.iter() {
-            if addr != sender {
-                tx.send(msg.clone()).unwrap();
-            }
+    pub async fn send(&self, to: &u64, msg: WsMessage) {
+        if let Some(tx) = self.clients.get(&to) {
+            tx.send(msg).unwrap();
         }
     }
 }

@@ -10,3 +10,4 @@ anyhow = "1.0.71"
 hyper = "0.14.27"
 fastwebsockets = { git = "https://github.com/denoland/fastwebsockets.git", features = ["hyper", "upgrade"] }
 tokio = { version = "1.29.1", features = ["full"] }
+rand = "0.8.5"
