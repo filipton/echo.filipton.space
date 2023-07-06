@@ -96,9 +96,15 @@ async fn request_handler(
 
         let mut file = state.files.get(uri);
         if file.is_none() {
+            // default fallback for sveltekit static files
+            file = state.files.get("/index.html");
+
+            /*
+            // default file
             file = state
                 .files
                 .get(&format!("{}/index.html", uri.trim_end_matches('/')));
+            */
 
             if file.is_some() {
                 is_html = true;
