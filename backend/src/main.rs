@@ -66,7 +66,11 @@ async fn request_handler(
         return Ok(resp);
     } else if uri == "/ws" && is_upgrade_request(&req) {
         let (resp, fut) = upgrade(&mut req)?;
-        let client_id = rand::random();
+        let client_id = if let Some(query) = req.uri().query() {
+            query.parse()?
+        } else {
+            rand::random()
+        };
 
         tokio::spawn(async move {
             let ws = fastwebsockets::FragmentCollector::new(fut.await.unwrap());
