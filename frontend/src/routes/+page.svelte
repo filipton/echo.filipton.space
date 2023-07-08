@@ -15,7 +15,7 @@
 
     onMount(async () => {
         if ($page.url.search.length > 0) {
-            let tmpClientId = parseInt($page.url.search.slice(1));
+            let tmpClientId = BigInt($page.url.search.slice(1));
 
             if (tmpClientId > 0) {
                 clientParams = `?${tmpClientId}`;
@@ -37,18 +37,9 @@
 
         webSocket.onmessage = (event) => {
             if (typeof event.data === "object") {
-                let uint8Array = new Uint8Array(event.data);
-                clientId = BigInt(
-                    uint8Array.slice(0, 8).reduce((acc, cur) => {
-                        return (acc << 8n) + BigInt(cur);
-                    }, 0n)
-                );
+                let dataView = new DataView(event.data);
+                clientId = dataView.getBigUint64(0, false);
 
-                window.history.pushState(
-                    null,
-                    "",
-                    `?${clientId}`
-                );
                 window.history.replaceState(
                     null,
                     "",
