@@ -11,6 +11,8 @@
     let clientId = -1n;
     let requests: string[] = [];
 
+    let requestUrl: string;
+
     onMount(async () => {
         if ($page.url.search.length > 0) {
             let tmpClientId = parseInt($page.url.search.slice(1));
@@ -42,6 +44,12 @@
                     }, 0n)
                 );
 
+                if (dev) {
+                    requestUrl = `http://localhost:8080/r${clientId}`;
+                } else {
+                    requestUrl = `${$page.url.origin}/r${clientId}`;
+                }
+
                 return;
             } else {
                 let requestStr = event.data;
@@ -56,6 +64,13 @@
 </script>
 
 <h1 class="text-4xl font-bold">Requests:</h1>
+<p>
+    Use <a class="font-bold underline" href={requestUrl}>{requestUrl}</a> as your
+    request url!
+</p>
+
 {#each requests as request}
-    <p class="text-xl my-2 border-black border-t-2 border-b-2 border-solid">{request}</p>
+    <p class="text-xl my-2 border-black border-t-2 border-b-2 border-solid">
+        {request}
+    </p>
 {/each}
