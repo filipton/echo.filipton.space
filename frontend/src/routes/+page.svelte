@@ -44,6 +44,11 @@
                     }, 0n)
                 );
 
+                window.history.pushState(
+                    null,
+                    "",
+                    `?${clientId}`
+                );
                 window.history.replaceState(
                     null,
                     "",
