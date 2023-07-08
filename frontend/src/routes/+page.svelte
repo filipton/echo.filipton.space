@@ -44,6 +44,12 @@
                     }, 0n)
                 );
 
+                window.history.replaceState(
+                    null,
+                    "",
+                    `?${clientId}`
+                );
+
                 if (dev) {
                     requestUrl = `http://localhost:8080/r${clientId}`;
                 } else {
@@ -59,6 +65,7 @@
 
         webSocket.onclose = () => {
             console.log("WebSocket disconnected");
+            setTimeout(connectWs, 1000);
         };
     }
 </script>
