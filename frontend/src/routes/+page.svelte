@@ -4,6 +4,7 @@
     import { onMount } from "svelte";
 
     let webSocket: WebSocket;
+    let pingTimeout: number;
     let wsScheme = $page.url.protocol === "https:" ? "wss" : "ws";
     let wsServer = dev ? "localhost:8080" : $page.url.host;
 
@@ -33,6 +34,8 @@
 
         webSocket.onopen = () => {
             console.log("WebSocket connected");
+
+            pingTimeout = setTimeout(ping, 10000);
         };
 
         webSocket.onmessage = (event) => {
@@ -40,11 +43,7 @@
                 let dataView = new DataView(event.data);
                 clientId = dataView.getBigUint64(0, false);
 
-                window.history.replaceState(
-                    null,
-                    "",
-                    `?${clientId}`
-                );
+                window.history.replaceState(null, "", `?${clientId}`);
 
                 if (dev) {
                     requestUrl = `http://localhost:8080/r${clientId}`;
@@ -61,8 +60,15 @@
 
         webSocket.onclose = () => {
             console.log("WebSocket disconnected");
+
+            clearTimeout(pingTimeout);
             setTimeout(connectWs, 1000);
         };
+    }
+
+    function ping() {
+        webSocket.send("ping");
+        pingTimeout = setTimeout(ping, 10000);
     }
 </script>
 
