@@ -2,7 +2,8 @@ use anyhow::Result;
 use fastwebsockets::upgrade::{is_upgrade_request, upgrade};
 use hyper::server::conn::Http;
 use hyper::service::service_fn;
-use hyper::{Body, Request, Response};
+use hyper::{Body, Client, Request, Response};
+use hyper_tls::HttpsConnector;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -11,7 +12,10 @@ use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use utils::{read_static_files, request_to_raw_http};
 
+use crate::github::authorize_github_user;
+
 mod echo;
+mod github;
 mod structs;
 mod utils;
 mod webhook;
@@ -23,9 +27,15 @@ async fn main() -> Result<()> {
 
     println!("Listening on {}", addr);
 
+    let https = HttpsConnector::new();
+    let client = Client::builder().build::<_, hyper::Body>(https);
+
     let state = Arc::new(RwLock::new(State {
         files: read_static_files("/")?,
         clients: HashMap::new(),
+        http_client: client,
+        github_client_id: std::env::var("GITHUB_CLIENT_ID")?,
+        github_client_secret: std::env::var("GITHUB_CLIENT_SECRET")?,
     }));
     println!("Loaded {} static files!", state.read().await.files.len());
 
@@ -93,6 +103,22 @@ async fn request_handler(
             .await;
 
         return Ok(Response::builder().status(200).body("OK".into())?);
+    } else if uri == "/oauth/callback" {
+        let github_code = req
+            .uri()
+            .query()
+            .expect("Query should exist")
+            .split("=")
+            .nth(1)
+            .expect("Code should exist");
+
+        return Ok(Response::builder().status(200).body(
+            format!(
+                "Github login: {}",
+                authorize_github_user(&state, github_code).await?
+            )
+            .into(),
+        )?);
     } else {
         // serve static files
         let state = state.read().await;

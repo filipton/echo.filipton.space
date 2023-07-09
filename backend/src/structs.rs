@@ -9,6 +9,9 @@ pub type SharedState = Arc<RwLock<State>>;
 pub struct State {
     pub files: HashMap<String, Vec<u8>>,
     pub clients: HashMap<u64, Tx>,
+    pub http_client: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>,
+    pub github_client_id: String,
+    pub github_client_secret: String,
 }
 
 impl State {

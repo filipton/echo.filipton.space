@@ -7,8 +7,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.71"
-hyper = "0.14.27"
+hyper = { version = "0.14.27", features = ["full"] }
 fastwebsockets = { git = "https://github.com/denoland/fastwebsockets.git", features = ["hyper", "upgrade"] }
-tokio = { version = "1.29.1", features = ["full"] }
+tokio = { version = "1.27.0", features = ["full"] }
 rand = "0.8.5"
 mime_guess = "2.0.4"
+hyper-tls = "0.5.0"
+serde_json = "1.0.100"
