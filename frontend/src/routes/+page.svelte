@@ -1,17 +1,19 @@
 <script lang="ts">
     import { dev } from "$app/environment";
     import { page } from "$app/stores";
-    import { onMount } from "svelte";
+    import { onDestroy, onMount } from "svelte";
     import { parseRequest, type HttpRequest } from "../lib/utils";
 
     let webSocket: WebSocket;
     let pingTimeout: number;
+    let wsDestroyed = false;
+
     let wsScheme = $page.url.protocol === "https:" ? "wss" : "ws";
     let wsServer = dev ? "localhost:8080" : $page.url.host;
 
     let clientParams = "";
     let clientId = -1n;
-    let requests: string[] = [];
+    let requests: HttpRequest[] = [];
 
     let requestUrl: string;
 
@@ -54,11 +56,9 @@
 
                 return;
             } else {
-                let requestStr = event.data;
-                let request: HttpRequest = parseRequest(requestStr);
-                console.log(request);
+                let request: HttpRequest = parseRequest(event.data);
 
-                requests = [requestStr, ...requests];
+                requests = [request, ...requests];
             }
         };
 
@@ -66,9 +66,14 @@
             console.log("WebSocket disconnected");
 
             clearTimeout(pingTimeout);
-            setTimeout(connectWs, 1000);
+            if (!wsDestroyed) setTimeout(connectWs, 100);
         };
     }
+
+    onDestroy(() => {
+        wsDestroyed = true;
+        if (webSocket) webSocket.close();
+    });
 
     function ping() {
         webSocket.send("ping");
@@ -84,6 +89,20 @@
 
 {#each requests as request}
     <p class="text-xl my-2 border-black border-t-2 border-b-2 border-solid">
-        {request}
+        {request.method}
+        {request.url}
+        {request.version}
+
+        {#each request.headers as header}
+            <p class="text-lg">
+                {header[0]}: {header[1]}
+            </p>
+        {/each}
+
+        {#if request.body}
+            <p class="text-lg mt-2">
+                {request.body}
+            </p>
+        {/if}
     </p>
 {/each}
