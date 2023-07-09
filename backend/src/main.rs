@@ -50,7 +50,7 @@ async fn main() -> Result<()> {
 
 async fn request_handler(
     mut req: Request<Body>,
-    _client_addr: SocketAddr,
+    client_addr: SocketAddr,
     state: SharedState,
 ) -> Result<Response<Body>> {
     let uri = req.uri().path();
@@ -85,10 +85,10 @@ async fn request_handler(
         return Ok(resp);
     } else if uri.starts_with("/r") {
         let client_id = uri[2..].parse()?;
-        let req_str = request_to_raw_http(req).await?;
+        let req_str = request_to_raw_http(req, &client_addr).await?;
 
         let state = state.read().await;
-        state
+        _ = state
             .send(&client_id, WsMessage::Text(req_str.into()))
             .await;
 

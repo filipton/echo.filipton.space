@@ -1,6 +1,7 @@
 use fastwebsockets::Frame;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{mpsc::UnboundedSender, RwLock};
+use anyhow::Result;
 
 pub type Tx = UnboundedSender<WsMessage>;
 pub type SharedState = Arc<RwLock<State>>;
@@ -11,10 +12,12 @@ pub struct State {
 }
 
 impl State {
-    pub async fn send(&self, to: &u64, msg: WsMessage) {
+    pub async fn send(&self, to: &u64, msg: WsMessage) -> Result<()> {
         if let Some(tx) = self.clients.get(&to) {
-            tx.send(msg).unwrap();
+            tx.send(msg)?;
         }
+
+        Ok(())
     }
 }
 
