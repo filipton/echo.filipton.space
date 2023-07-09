@@ -1,8 +1,8 @@
 use anyhow::Result;
 use hyper::{Body, Request};
-use std::{collections::HashMap, net::SocketAddr};
+use std::collections::HashMap;
 
-pub async fn request_to_raw_http(req: Request<Body>, client_ip: &SocketAddr) -> Result<String> {
+pub async fn request_to_raw_http(req: Request<Body>) -> Result<String> {
     let mut raw = format!(
         "{} {} {:?}\r\n",
         req.method(),
@@ -10,7 +10,6 @@ pub async fn request_to_raw_http(req: Request<Body>, client_ip: &SocketAddr) -> 
         req.version()
     );
 
-    raw.push_str(&format!("{}: {}\r\n", "X-Real-IP", client_ip.ip()));
     for (name, value) in req.headers() {
         raw.push_str(&format!("{}: {}\r\n", name, value.to_str()?));
     }
