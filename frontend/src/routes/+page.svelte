@@ -2,6 +2,7 @@
     import { dev } from "$app/environment";
     import { page } from "$app/stores";
     import { onMount } from "svelte";
+    import { parseRequest, type HttpRequest } from "../lib/utils";
 
     let webSocket: WebSocket;
     let pingTimeout: number;
@@ -54,6 +55,9 @@
                 return;
             } else {
                 let requestStr = event.data;
+                let request: HttpRequest = parseRequest(requestStr);
+                console.log(request);
+
                 requests = [requestStr, ...requests];
             }
         };

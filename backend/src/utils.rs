@@ -6,7 +6,7 @@ pub async fn request_to_raw_http(req: Request<Body>) -> Result<String> {
     let mut raw = format!(
         "{} {} {:?}\r\n",
         req.method(),
-        req.uri().path(),
+        req.uri().path_and_query().unwrap(),
         req.version()
     );
 
