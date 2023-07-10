@@ -5,7 +5,7 @@ use serde_json::Value;
 
 const ACCESS_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
 
-pub async fn authorize_github_user(state: &SharedState, code: &str) -> Result<String> {
+pub async fn authorize_github_user(state: &SharedState, code: &str) -> Result<(u64, String)> {
     let state = state.read().await;
     let url = format!(
         "{}?client_id={}&client_secret={}&code={}",
@@ -30,7 +30,7 @@ pub async fn authorize_github_user(state: &SharedState, code: &str) -> Result<St
 async fn get_github_user_login(
     http_client: &hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>,
     access_token: &str,
-) -> Result<String> {
+) -> Result<(u64, String)> {
     let req = Request::builder()
         .method("GET")
         .uri("https://api.github.com/user")
@@ -42,7 +42,9 @@ async fn get_github_user_login(
     let resp = http_client.request(req).await?;
     let json = hyper::body::to_bytes(resp.into_body()).await?;
     let json: Value = serde_json::from_slice(&json)?;
+
+    let id = json["id"].as_u64().unwrap();
     let login = json["login"].as_str().unwrap();
 
-    Ok(login.to_string())
+    Ok((id, login.to_string()))
 }

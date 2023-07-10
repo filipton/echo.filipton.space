@@ -114,7 +114,7 @@ async fn request_handler(
 
         return Ok(Response::builder().status(200).body(
             format!(
-                "Github login: {}",
+                "Github login: {:?}",
                 authorize_github_user(&state, github_code).await?
             )
             .into(),
