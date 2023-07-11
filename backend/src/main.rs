@@ -122,17 +122,14 @@ async fn request_handler(
             .nth(1)
             .expect("Code should exist");
 
-        return login_github_user(&state, authorize_github_user(&state, github_code).await?).await;
+        let res =
+            login_github_user(&state, authorize_github_user(&state, github_code).await?).await;
 
-        /*
-        return Ok(Response::builder().status(200).body(
-            format!(
-                "Github login: {:?}",
-                authorize_github_user(&state, github_code).await?
-            )
-            .into(),
-        )?);
-        */
+        if let Ok(res) = res {
+            return Ok(res);
+        } else {
+            return Ok(Response::builder().status(500).body("Error".into())?);
+        }
     } else {
         // serve static files
         let state = state.read().await;

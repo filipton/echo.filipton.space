@@ -9,6 +9,7 @@ services:
     environment:
       GITHUB_CLIENT_ID: xxxxxxxxxxxxxxxxxxxx
       GITHUB_CLIENT_SECRET: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      DATABASE_URL: postgres://user:password@ip:port/db
   db:
     image: postgres
     restart: always

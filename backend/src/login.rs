@@ -9,9 +9,31 @@ pub async fn login_github_user<T>(
 where
     T: From<String>,
 {
+    let (id, username) = github_info;
     let state = state.read().await;
 
-    Ok(Response::builder()
+    sqlx::query!(
+        "INSERT INTO users (id, login) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET login = $2",
+        id as i64,
+        username
+    )
+    .execute(&state.db_pool)
+    .await?;
+
+    let token = sqlx::query_scalar!(
+        "INSERT INTO sessions(id) VALUES ($1) RETURNING TOKEN",
+        id as i64
+    )
+    .fetch_one(&state.db_pool)
+    .await?;
+
+    if token.is_none() {
+        return Ok(Response::builder()
+            .status(500)
+            .body(format!("Internal server error!").into())?);
+    }
+
+    return Ok(Response::builder()
         .status(200)
-        .body(format!("dsa").into())?)
+        .body(token.unwrap().to_string().into())?);
 }
