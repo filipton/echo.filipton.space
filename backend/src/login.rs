@@ -35,5 +35,6 @@ where
 
     return Ok(Response::builder()
         .status(200)
+        .header("Set-Cookie", format!("token={}; HttpOnly", token.unwrap()))
         .body(token.unwrap().to_string().into())?);
 }
