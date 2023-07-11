@@ -1,0 +1,21 @@
+version: '3.3'
+services:
+  echo:
+    image: filipton/echo:latest
+    container_name: echo.filipton.space
+    restart: always
+    ports:
+      - 127.0.0.1:35431:8080
+    environment:
+      GITHUB_CLIENT_ID: xxxxxxxxxxxxxxxxxxxx
+      GITHUB_CLIENT_SECRET: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      POSTGRES_USER: root
+    ports:
+      - 5453:5432
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data

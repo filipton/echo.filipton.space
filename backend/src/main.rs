@@ -4,6 +4,8 @@ use hyper::server::conn::Http;
 use hyper::service::service_fn;
 use hyper::{Body, Client, Request, Response};
 use hyper_tls::HttpsConnector;
+use login::login_github_user;
+use sqlx::postgres::PgPoolOptions;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -16,6 +18,7 @@ use crate::github::authorize_github_user;
 
 mod echo;
 mod github;
+mod login;
 mod structs;
 mod utils;
 mod webhook;
@@ -29,11 +32,18 @@ async fn main() -> Result<()> {
 
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
+    let pool = PgPoolOptions::new()
+        .max_connections(15)
+        .connect(&std::env::var("DATABASE_URL")?)
+        .await?;
 
     let state = Arc::new(RwLock::new(State {
         files: read_static_files("/")?,
         clients: HashMap::new(),
+
         http_client: client,
+        db_pool: pool,
+
         github_client_id: std::env::var("GITHUB_CLIENT_ID")?,
         github_client_secret: std::env::var("GITHUB_CLIENT_SECRET")?,
     }));
@@ -112,6 +122,9 @@ async fn request_handler(
             .nth(1)
             .expect("Code should exist");
 
+        return login_github_user(&state, authorize_github_user(&state, github_code).await?).await;
+
+        /*
         return Ok(Response::builder().status(200).body(
             format!(
                 "Github login: {:?}",
@@ -119,6 +132,7 @@ async fn request_handler(
             )
             .into(),
         )?);
+        */
     } else {
         // serve static files
         let state = state.read().await;
