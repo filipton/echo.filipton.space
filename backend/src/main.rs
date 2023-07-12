@@ -128,7 +128,7 @@ async fn request_handler(
         if let Ok(res) = res {
             return Ok(res);
         } else {
-            return Ok(Response::builder().status(500).body("Error".into())?);
+            return Ok(Response::builder().status(500).body("Internal server error".into())?);
         }
     } else if uri == "/logout" {
         let res = logout_user(&state, req.headers().get("cookie")).await;
@@ -136,7 +136,9 @@ async fn request_handler(
         if let Ok(res) = res {
             return Ok(res);
         } else {
-            return Ok(Response::builder().status(500).body("Error".into())?);
+            return Ok(Response::builder()
+                .status(500)
+                .body("Internal server error".into())?);
         }
     } else {
         // serve static files

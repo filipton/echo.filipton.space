@@ -41,11 +41,11 @@ where
             "Set-Cookie",
             format!(
                 "token={}; HttpOnly; Max-Age=2678400; Path=/",
-                token.unwrap()
+                token.expect("Token is none")
             ),
         )
         .header("Location", "/")
-        .body(token.unwrap().to_string().into())?);
+        .body(token.expect("Token is none").to_string().into())?);
 }
 
 pub async fn logout_user<T>(
@@ -61,8 +61,8 @@ where
         .split("; ")
         .map(|cookie| {
             let mut split = cookie.split("=");
-            let key = split.next().unwrap().to_string();
-            let value = split.next().unwrap().to_string();
+            let key = split.next().unwrap_or_default().to_string();
+            let value = split.next().unwrap_or_default().to_string();
 
             (key, value)
         })
@@ -84,17 +84,20 @@ where
 async fn delete_sessions(state: &SharedState, token: &sqlx::types::Uuid) -> Result<()> {
     let state = state.read().await;
 
-    loop {
+    let mut tries = 0;
+    while tries < 10 {
         let res = sqlx::query!("DELETE FROM sessions WHERE token = $1", &token)
             .execute(&state.db_pool)
             .await;
 
         if let Ok(_) = res {
+            return Ok(());
             break;
         }
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        tries += 1;
     }
 
-    return Ok(());
+    return Err(anyhow::anyhow!("Failed to delete session"));
 }
