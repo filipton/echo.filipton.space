@@ -4,7 +4,7 @@ use hyper::server::conn::Http;
 use hyper::service::service_fn;
 use hyper::{Body, Client, Request, Response};
 use hyper_tls::HttpsConnector;
-use login::login_github_user;
+use login::{login_github_user, logout_user};
 use sqlx::postgres::PgPoolOptions;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -124,6 +124,14 @@ async fn request_handler(
 
         let res =
             login_github_user(&state, authorize_github_user(&state, github_code).await?).await;
+
+        if let Ok(res) = res {
+            return Ok(res);
+        } else {
+            return Ok(Response::builder().status(500).body("Error".into())?);
+        }
+    } else if uri == "/logout" {
+        let res = logout_user(&state, req.headers().get("cookie")).await;
 
         if let Ok(res) = res {
             return Ok(res);
