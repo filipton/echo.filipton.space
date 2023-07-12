@@ -45,6 +45,7 @@
             if (typeof event.data === "object") {
                 let dataView = new DataView(event.data);
                 clientId = dataView.getBigUint64(0, false);
+                clientParams = `?${clientId}`;
 
                 window.history.replaceState(null, "", `?${clientId}`);
 
