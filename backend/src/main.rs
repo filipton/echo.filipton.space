@@ -1,27 +1,29 @@
 use anyhow::Result;
-use fastwebsockets::upgrade::{is_upgrade_request, upgrade};
+use handler::handler;
 use hyper::server::conn::Http;
 use hyper::service::service_fn;
 use hyper::{Body, Client, Request, Response};
 use hyper_tls::HttpsConnector;
-use login::{login_github_user, logout_user};
 use sqlx::postgres::PgPoolOptions;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use structs::{SharedState, State, WsMessage};
+use structs::{SharedState, State};
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
-use utils::{read_static_files, request_to_raw_http};
-
-use crate::github::authorize_github_user;
+use utils::read_static_files;
 
 mod echo;
 mod github;
+mod handler;
 mod login;
 mod structs;
 mod utils;
 mod webhook;
+
+lazy_static::lazy_static! {
+    static ref IS_DEV: bool = std::env::var("DEV").is_ok();
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,6 +31,9 @@ async fn main() -> Result<()> {
     let listener = TcpListener::bind(addr).await?;
 
     println!("Listening on {}", addr);
+    if *IS_DEV {
+        println!("Running in dev mode!");
+    }
 
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
@@ -69,113 +74,25 @@ async fn main() -> Result<()> {
 }
 
 async fn request_handler(
-    mut req: Request<Body>,
+    req: Request<Body>,
     _client_addr: SocketAddr,
     state: SharedState,
 ) -> Result<Response<Body>> {
-    let uri = req.uri().path();
+    let res = handler(req, _client_addr, state).await;
 
-    if uri == "/" && is_upgrade_request(&req) {
-        let (resp, fut) = upgrade(&mut req)?;
+    if let Err(err) = &res {
+        println!("Error: {:?}", err);
 
-        tokio::spawn(async move {
-            let ws = fastwebsockets::FragmentCollector::new(fut.await.unwrap());
-            echo::handle_ws(ws).await.unwrap();
-        });
-
-        return Ok(resp);
-    } else if uri == "/ws" && is_upgrade_request(&req) {
-        let (resp, fut) = upgrade(&mut req)?;
-        let client_id = if let Some(query) = req.uri().query() {
-            query.parse()?
-        } else {
-            rand::random()
-        };
-
-        tokio::spawn(async move {
-            let ws = fastwebsockets::FragmentCollector::new(fut.await.unwrap());
-            webhook::handle_ws(ws, &client_id, &state).await.unwrap();
-
-            {
-                let mut state = state.write().await;
-                state.clients.remove(&client_id);
-            }
-        });
-
-        return Ok(resp);
-    } else if uri.starts_with("/r") {
-        let client_id = uri[2..].parse()?;
-        let req_str = request_to_raw_http(req).await?;
-
-        let state = state.read().await;
-        _ = state
-            .send(&client_id, WsMessage::Text(req_str.into()))
-            .await;
-
-        return Ok(Response::builder().status(200).body("OK".into())?);
-    } else if uri == "/oauth/callback" {
-        let github_code = req
-            .uri()
-            .query()
-            .expect("Query should exist")
-            .split("=")
-            .nth(1)
-            .expect("Code should exist");
-
-        let res =
-            login_github_user(&state, authorize_github_user(&state, github_code).await?).await;
-
-        if let Ok(res) = res {
-            return Ok(res);
-        } else {
-            return Ok(Response::builder().status(500).body("Internal server error".into())?);
-        }
-    } else if uri == "/logout" {
-        let res = logout_user(&state, req.headers().get("cookie")).await;
-
-        if let Ok(res) = res {
-            return Ok(res);
+        if *IS_DEV {
+            return Ok(Response::builder()
+                .status(500)
+                .body(Body::from(format!("Error: {:?}", err)))?);
         } else {
             return Ok(Response::builder()
                 .status(500)
-                .body("Internal server error".into())?);
-        }
-    } else {
-        // serve static files
-        let state = state.read().await;
-        let mut is_html = false;
-
-        let mut file = state.files.get(uri);
-        if file.is_none() {
-            // default fallback for sveltekit static files
-            file = state.files.get("/index.html");
-
-            /*
-            // default file
-            file = state
-                .files
-                .get(&format!("{}/index.html", uri.trim_end_matches('/')));
-            */
-
-            if file.is_some() {
-                is_html = true;
-            }
-        }
-
-        if let Some(file) = file {
-            let content_type = if is_html {
-                "text/html".to_string()
-            } else {
-                mime_guess::from_path(uri).first_or_text_plain().to_string()
-            };
-
-            return Ok(Response::builder()
-                .status(200)
-                .header("Content-Type", content_type)
-                .body(file.to_owned().into())?);
+                .body(Body::from("Internal Server Error"))?);
         }
     }
 
-    let resp = Response::builder().status(404).body("Not found".into())?;
-    return Ok(resp);
+    res
 }

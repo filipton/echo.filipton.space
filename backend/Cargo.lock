@@ -64,6 +64,7 @@ dependencies = [
  "fastwebsockets",
  "hyper",
  "hyper-tls",
+ "lazy_static",
  "mime_guess",
  "rand",
  "serde_json",

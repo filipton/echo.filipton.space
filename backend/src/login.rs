@@ -2,15 +2,12 @@ use std::collections::HashMap;
 
 use crate::structs::SharedState;
 use anyhow::Result;
-use hyper::{http::HeaderValue, Request, Response};
+use hyper::{http::HeaderValue, Body, Response};
 
-pub async fn login_github_user<T>(
+pub async fn login_github_user(
     state: &SharedState,
     github_info: (u64, String),
-) -> Result<Response<T>>
-where
-    T: From<String>,
-{
+) -> Result<Response<Body>> {
     let (id, username) = github_info;
     let state = state.read().await;
 
@@ -48,13 +45,10 @@ where
         .body(token.expect("Token is none").to_string().into())?);
 }
 
-pub async fn logout_user<T>(
+pub async fn logout_user(
     state: &SharedState,
     cookies_header: Option<&HeaderValue>,
-) -> Result<Response<T>>
-where
-    T: From<String>,
-{
+) -> Result<Response<Body>> {
     let cookies: HashMap<String, String> = cookies_header
         .unwrap_or(&HeaderValue::from_static(""))
         .to_str()?
@@ -92,7 +86,6 @@ async fn delete_sessions(state: &SharedState, token: &sqlx::types::Uuid) -> Resu
 
         if let Ok(_) = res {
             return Ok(());
-            break;
         }
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
