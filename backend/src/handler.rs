@@ -80,6 +80,13 @@ pub async fn handler(
         .await;
     } else if uri == "/oauth/logout" {
         return login::logout_user(&state, req.headers().get("cookie")).await;
+    } else if uri == "/api/me" {
+        let user_info = login::get_user_info(&state, req.headers().get("cookie")).await?;
+
+        return Ok(Response::builder()
+            .status(200)
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&user_info)?.into())?);
     } else {
         let state = state.read().await;
         let mut is_html = false;

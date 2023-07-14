@@ -1,8 +1,50 @@
-use std::collections::HashMap;
-
 use crate::structs::SharedState;
 use anyhow::Result;
 use hyper::{http::HeaderValue, Body, Response};
+use serde::Serialize;
+use std::collections::HashMap;
+
+#[derive(Debug, Serialize)]
+pub struct UserInfo {
+    pub id: i64,
+    pub login: String,
+}
+
+pub async fn get_user_info(
+    state: &SharedState,
+    cookies_header: Option<&HeaderValue>,
+) -> Result<Option<UserInfo>> {
+    if cookies_header.is_none() {
+        return Ok(None);
+    }
+
+    let cookies: HashMap<String, String> = cookies_header
+        .unwrap_or(&HeaderValue::from_static(""))
+        .to_str()?
+        .split("; ")
+        .map(|cookie| {
+            let mut split = cookie.split("=");
+            let key = split.next().unwrap_or_default().to_string();
+            let value = split.next().unwrap_or_default().to_string();
+
+            (key, value)
+        })
+        .collect();
+
+    let token = sqlx::types::Uuid::parse_str(cookies.get("token").unwrap_or(&"".to_string()))?;
+
+    let state = state.read().await;
+
+    let res = sqlx::query_as!(
+        UserInfo,
+        "SELECT users.id, users.login FROM users INNER JOIN sessions USING (id) WHERE sessions.token = $1",
+        token
+    )
+    .fetch_optional(&state.db_pool)
+    .await?;
+
+    return Ok(res);
+}
 
 pub async fn login_github_user(
     state: &SharedState,
@@ -49,6 +91,13 @@ pub async fn logout_user(
     state: &SharedState,
     cookies_header: Option<&HeaderValue>,
 ) -> Result<Response<Body>> {
+    if cookies_header.is_none() {
+        return Ok(Response::builder()
+            .status(307)
+            .header("Location", "/")
+            .body("".into())?);
+    }
+
     let cookies: HashMap<String, String> = cookies_header
         .unwrap_or(&HeaderValue::from_static(""))
         .to_str()?
