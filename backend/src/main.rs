@@ -17,6 +17,7 @@ mod echo;
 mod github;
 mod handler;
 mod login;
+mod router;
 mod structs;
 mod utils;
 mod webhook;

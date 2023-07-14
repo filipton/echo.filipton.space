@@ -81,21 +81,12 @@ pub async fn handler(
     } else if uri == "/oauth/logout" {
         return login::logout_user(&state, req.headers().get("cookie")).await;
     } else {
-        // serve static files
         let state = state.read().await;
         let mut is_html = false;
 
         let mut file = state.files.get(uri);
         if file.is_none() {
-            // default fallback for sveltekit static files
             file = state.files.get("/index.html");
-
-            /*
-            // default file
-            file = state
-                .files
-                .get(&format!("{}/index.html", uri.trim_end_matches('/')));
-            */
 
             if file.is_some() {
                 is_html = true;
