@@ -32,7 +32,6 @@ pub async fn get_user_info(
         .collect();
 
     let token = sqlx::types::Uuid::parse_str(cookies.get("token").unwrap_or(&"".to_string()))?;
-
     let state = state.read().await;
 
     let res = sqlx::query_as!(
